@@ -1,0 +1,23 @@
+<section class="phx-hero">
+  <h1>Awesome Elixir</h1>
+  <div>
+  <%= for section <- @sections do %>
+  <div><%= show_section_link(section) %></div>
+  <% end %>
+  </div><br/>
+  <%= for section <- @libs do %>
+  <div>
+  <%= show_section_name(section) %>
+  <%= show_section_desc(section) %>
+  <%= for lib <- section do %>
+  <div>
+      <a href="<%=lib.ref%>" ><%= lib.name %></a>
+      - <%= raw lib.desc %>
+      <br/><b>Stars:</b> <i><%= lib.stars %></i>
+      <b>Days since last commit:</b> <i><%= lib.days %></i>
+  </div>
+  <% end %>
+  </div>
+  <br>
+<% end %>
+</section>
