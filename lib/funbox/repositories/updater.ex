@@ -17,7 +17,7 @@ defmodule Funbox.Repositories.Updater do
   defp tick, do: Process.send_after(self(), :tick, @tick_interval)
 
   def handle_info(:tick, _) do
-    Funbox.Repositories.DBRequests.update_libs()
+    Funbox.Repositories.update_libs()
     IO.inspect("Libraries updated!")
     tick()
 

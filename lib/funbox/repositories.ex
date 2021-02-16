@@ -1,12 +1,22 @@
-defmodule Funbox.Repositories.DBRequests do
+defmodule Funbox.Repositories do
   import Ecto.Query, only: [from: 2]
 
-  def get_libs(min_stars \\ 0) do
+  def get_libs_by_sections(min_stars \\ 0) do
     sections =
       get_sections(min_stars)
       |> Enum.map(&get_section(&1, min_stars))
 
     sections
+  end
+
+  def get_all_libs(min_stars \\ 0) do
+    query =
+      from u in Funbox.Repositories.Repository,
+        where: u.stars >= ^min_stars,
+        order_by: u.name,
+        select: u
+
+    Funbox.Repo.all(query)
   end
 
   def get_sections(min_stars \\ 0) do

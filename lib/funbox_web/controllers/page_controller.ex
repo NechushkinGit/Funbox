@@ -10,8 +10,8 @@ defmodule FunboxWeb.PageController do
         _ -> 0
       end
 
-    libs = Funbox.Repositories.DBRequests.get_libs(min_stars)
-    sections = Funbox.Repositories.DBRequests.get_sections(min_stars)
+    libs = Funbox.Repositories.get_libs_by_sections(min_stars)
+    sections = Funbox.Repositories.get_sections(min_stars)
     render(conn, "index.html", libs: libs, sections: sections)
   end
 end

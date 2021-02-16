@@ -22,7 +22,7 @@ defmodule Funbox.Repositories.GitReqs do
         urls =
           readme_content
           |> parse_readme()
-          |> Enum.slice(0..limit)
+          |> Enum.slice(0..(limit - 1))
           |> Enum.map(&path_with_params(&1))
 
         {:ok, urls}
