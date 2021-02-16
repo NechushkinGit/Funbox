@@ -1,5 +1,10 @@
 defmodule Funbox.Repositories.GitReqs do
-  @hackney [basic_auth: with {:ok, var} <- Application.fetch_env(:funbox, :git) do {var[:username], var[:token]} end]
+  @hackney [
+    basic_auth:
+      with {:ok, var} <- Application.fetch_env(:funbox, :git) do
+        {var[:username], var[:token]}
+      end
+  ]
 
   def get_libs(limit \\ -1) do
     case HTTPoison.get("https://api.github.com/repos/h4cc/awesome-elixir/readme", [],
@@ -8,16 +13,14 @@ defmodule Funbox.Repositories.GitReqs do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         {:ok, map} = body |> Jason.decode()
 
-        content =
+        readme_content =
           map["content"]
           |> String.split("\n")
           |> Enum.map(&Base.decode64!(&1))
           |> Enum.join("")
 
-        # Regex.scan(~r/https:\/\/github\.com\/\w+\/\w+/, content)
-        # |> Enum.map(&List.first(&1))
         urls =
-          content
+          readme_content
           |> parse_readme()
           |> Enum.slice(0..limit)
           |> Enum.map(&path_with_params(&1))
@@ -41,7 +44,6 @@ defmodule Funbox.Repositories.GitReqs do
       |> Enum.map(&parse_readme_block(&1))
       |> Enum.concat()
 
-    # |> Enum.slice(2..-1)
     blocks
   end
 
@@ -68,29 +70,26 @@ defmodule Funbox.Repositories.GitReqs do
   def extract_repo_info(repo, section, section_desc) do
     [_, link, desc] = repo
 
-    case Regex.run(~r/\[(.*?)\]\((.*?)\)/, desc) do
-      [_, name, href] ->
-        desc =
+    desc =
+      case Regex.run(~r/\[(.*?)\]\((.*?)\)/, desc) do
+        [_, name, href] ->
           Regex.replace(~r/\[(.*?)\]\((.*?)\)/, desc, "<a href=\"#{href}\">#{name}</a>")
           |> String.trim("-")
 
+        _ ->
+          String.trim(desc, "-")
+      end
 
-          case Regex.run(~r/\[(.*?)\]\((.*?)\)/, section_desc) do
-            [_, sname, sref] ->
-              section_desc = Regex.replace(~r/\[(.*?)\]\((.*?)\)/, section_desc, "<a href=\"#{sref}\">#{sname}</a>")
-              [link, section, section_desc, desc]
-            _ -> [link, section, section_desc, desc]
-          end
+    section_desc =
+      case Regex.run(~r/\[(.*?)\]\((.*?)\)/, section_desc) do
+        [_, sname, sref] ->
+          Regex.replace(~r/\[(.*?)\]\((.*?)\)/, section_desc, "<a href=\"#{sref}\">#{sname}</a>")
 
-      _ ->
-        desc = String.trim(desc, "-")
-        case Regex.run(~r/\[(.*?)\]\((.*?)\)/, section_desc) do
-          [_, sname, sref] ->
-            section_desc = Regex.replace(~r/\[(.*?)\]\((.*?)\)/, section_desc, "<a href=\"#{sref}\">#{sname}</a>")
-            [link, section, section_desc, desc]
-          _ -> [link, section, section_desc, desc]
-        end
-    end
+        _ ->
+          section_desc
+      end
+
+    [link, section, section_desc, desc]
   end
 
   def extract_name(path) do
@@ -135,7 +134,6 @@ defmodule Funbox.Repositories.GitReqs do
         stars
 
       {_, %HTTPoison.Response{status_code: 301, body: body}} ->
-        # IO.inspect(body)
         url =
           Regex.run(~r/https:\/\/api\.github\.com\/repositories\/[0-9]+/, body)
           |> List.first()

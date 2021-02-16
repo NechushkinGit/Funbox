@@ -30,24 +30,35 @@ defmodule Funbox.Repositories.DBRequests do
     Funbox.Repo.all(query)
   end
 
+  def insert_lib(lib) do
+    [name, link, stars, days, section, section_desc, desc] = lib
+
+    Funbox.Repo.insert(%Funbox.Repositories.Repository{
+      days: days,
+      ref: link,
+      name: name,
+      stars: stars,
+      section: section,
+      section_desc: section_desc,
+      desc: desc
+    })
+  end
+
+  def insert_libs(libs) do
+    for lib <- libs do
+      insert_lib(lib)
+    end
+  end
+
+  def delete_libs do
+    Funbox.Repo.delete_all(Funbox.Repositories.Repository)
+  end
+
   def update_libs(limit \\ -1) do
     case Funbox.Repositories.GitReqs.get_libs(limit) do
       {:ok, libs} ->
-        Funbox.Repo.delete_all(Funbox.Repositories.Repository)
-
-        for lib <- libs do
-          [name, link, stars, days, section, section_desc, desc] = lib
-
-          Funbox.Repo.insert(%Funbox.Repositories.Repository{
-            days: days,
-            ref: link,
-            name: name,
-            stars: stars,
-            section: section,
-            section_desc: section_desc,
-            desc: desc
-          })
-        end
+        delete_libs()
+        insert_libs(libs)
 
       {:error, reason} ->
         IO.inspect(reason)
