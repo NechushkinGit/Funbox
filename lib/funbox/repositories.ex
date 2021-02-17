@@ -1,74 +1,81 @@
 defmodule Funbox.Repositories do
-  import Ecto.Query, only: [from: 2]
+  import Ecto.Query
+  alias Funbox.Repositories.Repository
+  alias Funbox.Repo
 
   def get_libs_by_sections(min_stars \\ 0) do
-    sections =
-      get_sections(min_stars)
-      |> Enum.map(&get_section(&1, min_stars))
-
-    sections
+    min_stars
+    |> get_sections()
+    |> Enum.map(&get_section(&1, min_stars))
   end
 
-  def get_all_libs(min_stars \\ 0) do
-    query =
-      from u in Funbox.Repositories.Repository,
-        where: u.stars >= ^min_stars,
-        order_by: u.name,
-        select: u
-
-    Funbox.Repo.all(query)
+  def get_all_repos(min_stars \\ 0) do
+    Repository
+    |> where([a], a.stars >= ^min_stars)
+    |> order_by([a], asc: a.name)
+    |> Repo.all()
   end
 
   def get_sections(min_stars \\ 0) do
-    sections_query =
-      from u in Funbox.Repositories.Repository,
-        where: u.stars >= ^min_stars,
-        group_by: u.section,
-        order_by: u.section,
-        select: u.section
-
-    Funbox.Repo.all(sections_query)
+    Repository
+    |> where([a], a.stars >= ^min_stars)
+    |> group_by([a], a.section)
+    |> order_by([a], asc: a.section)
+    |> select([a], a.section)
+    |> Repo.all()
   end
 
   defp get_section(section, min_stars) do
-    query =
-      from u in Funbox.Repositories.Repository,
-        where: u.stars >= ^min_stars and u.section == ^section,
-        order_by: u.name,
-        select: u
-
-    Funbox.Repo.all(query)
+    Repository
+    |> where([a], a.stars >= ^min_stars and a.section == ^section)
+    |> order_by([a], asc: a.name)
+    |> Repo.all()
   end
 
-  def insert_lib(lib) do
-    [name, link, stars, days, section, section_desc, desc] = lib
-
-    Funbox.Repo.insert(%Funbox.Repositories.Repository{
-      days: days,
-      ref: link,
-      name: name,
-      stars: stars,
-      section: section,
-      section_desc: section_desc,
-      desc: desc
-    })
+  def create_repo(attrs) do
+    %Repository{}
+    |> Repository.changeset(attrs)
+    |> Repo.insert()
   end
 
-  def insert_libs(libs) do
-    for lib <- libs do
-      insert_lib(lib)
-    end
+  def create_repos(attrs_list) do
+    Enum.map(attrs_list, &create_repo(&1))
   end
 
-  def delete_libs do
-    Funbox.Repo.delete_all(Funbox.Repositories.Repository)
+  def delete_all_repos do
+    Repo.delete_all(Repository)
   end
 
-  def update_libs(limit \\ -1) do
+  def delete_repo(name) do
+    Repository
+    |> where([r], r.name == ^name)
+    |> Repo.delete_all()
+  end
+
+  def delete_repos(names) do
+    Repository
+    |> where([r], r.name in ^names)
+    |> Repo.delete_all()
+  end
+
+  def update_repos(limit \\ -1) do
     case Funbox.Repositories.GitReqs.get_libs(limit) do
-      {:ok, libs} ->
-        delete_libs()
-        insert_libs(libs)
+      {:ok, new_repos} ->
+        existing_repos_names =
+          get_all_repos()
+          |> Enum.map(& &1.name)
+
+        new_repos_names =
+          new_repos
+          |> Enum.map(& &1.name)
+
+        new_repos
+        |> Enum.filter(&(&1.name not in existing_repos_names))
+        |> create_repos()
+
+        existing_repos_names
+        |> Enum.filter(&(&1 not in new_repos_names))
+        |> delete_repos()
 
       {:error, reason} ->
         IO.inspect(reason)

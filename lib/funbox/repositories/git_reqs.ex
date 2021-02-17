@@ -19,13 +19,13 @@ defmodule Funbox.Repositories.GitReqs do
           |> Enum.map(&Base.decode64!(&1))
           |> Enum.join("")
 
-        urls =
+        libs =
           readme_content
           |> parse_readme()
           |> Enum.slice(0..(limit - 1))
-          |> Enum.map(&path_with_params(&1))
+          |> Enum.map(&make_repo(&1))
 
-        {:ok, urls}
+        {:ok, libs}
 
       {:ok, %HTTPoison.Response{status_code: 404}} ->
         {:error, "Not found :("}
@@ -38,58 +38,55 @@ defmodule Funbox.Repositories.GitReqs do
   def parse_readme(text) do
     newlines_replaced = Regex.replace(~r/\n/, text, "---")
 
-    blocks =
-      Regex.scan(~r/#\s(.*?)------#/, newlines_replaced)
+      ~r/#\s(.*?)------#/
+      |> Regex.scan(newlines_replaced)
       |> Enum.map(&List.first(&1))
       |> Enum.map(&parse_readme_block(&1))
       |> Enum.concat()
-
-    blocks
   end
 
   @spec parse_readme_block(binary) :: list
   def parse_readme_block(block) do
     case Regex.run(~r/^#\s(.*?)---\*(.*?)\*------/, block) do
-      [_, topic, topic_desc] ->
-        list =
-          Regex.scan(
-            ~r/(https:\/\/github\.com\/[\w\-_]+\/[\w\-_]+)\)\s-\s([\w\s,\(\)!\/\d\-\[\]\.:\\\~_\""]+)---/,
-            block
-          )
-          |> Enum.map(&extract_repo_info(&1, topic, topic_desc))
+      [_, section, section_desc] ->
+        section_desc = convert_section_desc_links(section_desc)
 
-        list
+          ~r/(https:\/\/github\.com\/[\w\-_]+\/[\w\-_]+)\)\s-\s([\w\s,\(\)!\/\d\-\[\]\.:\\\~_\""]+)---/
+          |> Regex.scan(block)
+          |> Enum.map(&extract_repo_info(&1))
+          |> Enum.map(&(Map.merge(&1, %{section: section, section_desc: section_desc})))
 
       _ ->
-        []
+        %{}
     end
-
-    # [_, topic] = Regex.run(~r/^#\s(.*?)\n/, block)
   end
 
-  def extract_repo_info(repo, section, section_desc) do
+  def extract_repo_info(repo) do
     [_, link, desc] = repo
 
     desc =
       case Regex.run(~r/\[(.*?)\]\((.*?)\)/, desc) do
         [_, name, href] ->
-          Regex.replace(~r/\[(.*?)\]\((.*?)\)/, desc, "<a href=\"#{href}\">#{name}</a>")
+          ~r/\[(.*?)\]\((.*?)\)/
+          |> Regex.replace(desc, "<a href=\"#{href}\">#{name}</a>")
           |> String.trim("-")
 
         _ ->
           String.trim(desc, "-")
       end
 
-    section_desc =
-      case Regex.run(~r/\[(.*?)\]\((.*?)\)/, section_desc) do
-        [_, sname, sref] ->
-          Regex.replace(~r/\[(.*?)\]\((.*?)\)/, section_desc, "<a href=\"#{sref}\">#{sname}</a>")
+    %{ref: link, desc: desc}
+  end
 
-        _ ->
-          section_desc
-      end
+  def convert_section_desc_links(section_desc) do
+    case Regex.run(~r/\[(.*?)\]\((.*?)\)/, section_desc) do
+      [_, sname, sref] ->
+        ~r/\[(.*?)\]\((.*?)\)/
+        |> Regex.replace(section_desc, "<a href=\"#{sref}\">#{sname}</a>")
 
-    [link, section, section_desc, desc]
+      _ ->
+        section_desc
+    end
   end
 
   def extract_name(path) do
@@ -97,18 +94,18 @@ defmodule Funbox.Repositories.GitReqs do
     name
   end
 
-  def path_with_params(path_section) do
-    [path, section, section_desc, desc] = path_section
-    parts = extract_params(path)
+  def make_repo(path_info) do
+    parts = extract_params(path_info.ref)
 
     if length(parts) == 2 do
       [a, b] = parts
       stars = get_stars_count(a, b)
       days = get_days_since_last_commit(a, b)
-      name = extract_name(path)
-      [name, path, stars, days, section, section_desc, desc]
+      name = extract_name(path_info.ref)
+
+      Map.merge(path_info, %{name: name, stars: stars, days: days})
     else
-      []
+      %{}
     end
   end
 

@@ -19,6 +19,8 @@ defmodule Funbox.Application do
       # {Funbox.Worker, arg}
     ]
 
+    GenServer.start_link(Funbox.Repositories.Updater, [])
+
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Funbox.Supervisor]

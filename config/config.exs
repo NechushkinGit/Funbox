@@ -26,8 +26,15 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+config :funbox, :git,
+  username: "TestName",
+  token: "TestToken"
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 
 import_config "#{Mix.env()}.exs"
-import_config "git_config.exs"
+
+if File.exists?("config/git_config.exs") do
+  import_config "git_config.exs"
+end
